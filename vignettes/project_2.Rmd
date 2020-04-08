@@ -1,0 +1,86 @@
+---
+title: "Project 2"
+author: "Matthew Herndon"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{project_2}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+# Introduction
+
+This package was developed as part of the Shiny Sampling class exercise for MATH5793. In addition to exposing the (modified) functions included in the original project files, this package makes it easy to run the simulation directly from the R console. Once installed via: 
+
+```{r, eval=FALSE}
+devtools::install_github('matt-m-herndon/class_exercise_shiny_sample')
+```
+
+...the Shiny simulation can be opened by running the following:
+
+```{r, eval=FALSE}
+distsim::runSimulation()
+```
+
+
+# Reactivity Description
+
+Reactivity is the name of Shiny's event handling backend. In short, it abstracts away most of the details of developing graphical interfaces, and makes developing interactive graphical interfaces with Shiny simple. Shiny applications are formed by linking three types of nodes together: value nodes (such as graphical widgets which accept input), expression nodes (which evaluate expressions when called), and observer nodes (which apply changes to graphical outputs.)
+
+![](../inst/exdata/webpic.png)
+
+Reactive value nodes generate events under certain conditions (e.g. when their value changes) which are operated on by reactive expression nodes then finally terminated at observer nodes.
+Expression nodes allow for sets of nodes (endpoints or additional constructors) to leverage the same evaluation without performing redundant calculations. Observer nodes provide a mechanism for modifying widgets (e.g. plotting after changes in parameters). Nodes are linked together---as seen below---to define how the application responds to input changes.
+
+![](../inst/exdata/webpic2.png)
+
+In this scheme, expression and observer nodes are not explicitly required, they just allow the system to react to value changes. It's perfectly valid to generate a static interface with only reactive value nodes---this would be fairly boring, though.
+
+
+# Plot Improvements
+
+Two of the plots were modified with color changes. The ``viridis`` package has a function which creates a Viridis colormap that can be applied ggPlot. This colormap makes it easier to understand the density plot, as contrast is easier to spot between high and low density areas.
+
+```{r eval=FALSE}
+gd = g + stat_density2d(aes(colour=..density..), geom='point', contour=F) + scale_color_viridis()
+```
+
+In addition to the density plot colormap change, the bottom right plot was given a new color. Not exactly exciting, but it's a nice shade of red! 
+
+```{r eval=FALSE}
+ad = a + geom_density(fill="red")
+```
+
+After this, the widgets were modified in several ways.
+
+
+# Widget Description
+
+1. Sample Size: The number of samples taken during each trial.
+
+2. Iterations: The number of simulation iterations to perform.
+
+3. $\mu$: The expected values of each variable in the population.
+
+4. $\Sigma$: The covariance matrix of the population variables.
+
+
+# Widget Modifications
+
+The other modifications I made to the application was to change how the widgets are laid out, use $\LaTeX$ to typeset widget titles, and to create a matrix input for controlling and visualizing $\Sigma$. 
+
+1. In the original application, the input widgets were located within the ``dashboardBody()`` layout. I moved them into the ``dashboardSidebar()`` layout which was previously empty. This new layout allows the plot to be enlarged, and also allows all widgets to be hidden at once by pressing the collapse symbol at the top of the screen. 
+
+2. Using a neat function included in Shiny (``withMathJax``), the titles were richly typeset to make the application more attractive. 
+
+3. Lastly, the three separate numeric input fields for controlling $S_{11}$, $S_{22}$, and $S_{12}$ were substituted for a matrix input widget. This widget allows all parameters to be seen as they exist within $\Sigma$, and makes it much easier to scale the application to more than two dimensions. Additional logic is included to ensure that $\Sigma$ will always be symmetric regardless of which field is changed.
+
+
