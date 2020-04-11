@@ -2,7 +2,7 @@ Package: project_2
 Type: Package
 Title: Project 2
 Version: 0.1.0
-Author: Dr. Wayne Stewart, Matthew Herndon
+Author: Matthew Herndon
 Description: No description yet.
 Encoding: UTF-8
 LazyData: true
@@ -17,4 +17,5 @@ Imports:
     ggplot2,
     mvtnorm,
     grid,
+    future
 RoxygenNote: 7.0.2
