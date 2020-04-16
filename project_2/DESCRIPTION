@@ -9,7 +9,6 @@ LazyData: true
 Suggests: knitr, rmarkdown
 VignetteBuilder: knitr
 Imports:
-    rprojroot,
     pracma,
     akima,
     ggplot2,

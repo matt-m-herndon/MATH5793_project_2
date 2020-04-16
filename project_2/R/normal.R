@@ -1,13 +1,12 @@
-library(rprojroot)
 library(pracma)
 library(akima)
 library(ggplot2)
 library(crayon)
 library(gridExtra)
 
-root <- rprojroot::is_r_package
+fpath <- system.file("exdata", "table_4_2_qq_critical.csv", package="project2normal")
 # Table 4.2 from the book
-qq_critical_points = read.csv(root$find_file("table_4_2_qq_critical.csv"))
+qq_critical_points = read.csv(fpath)
 
 
 #' Spline generator along significance dimension---was going to use 2D splines,
