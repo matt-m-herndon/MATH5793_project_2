@@ -3,6 +3,8 @@ library(pracma)
 library(abind)
 library(akima)
 library(ggplot2)
+library(crayon)
+library(gridExtra)
 
 root <- rprojroot::is_r_package
 # Table 4.2 from the book
@@ -51,21 +53,25 @@ boxcox = function(x,lambda){
   if (!is.matrix(lambda)) {
     lambda = matrix(lambda)
   }
+  
   stopifnot(length(dim(x))<=2, length(dim(lambda))<=2)
+  
   stopifnot(min(dim(x))==1, min(dim(lambda))==1)
   
   # generate mxn matrix
   m = prod(dim(x))
   n = prod(dim(lambda))
-  x = repmat(matrix(x,nr=m,nc=1),1,n)
+  # x must always be greater than 0
+  x = repmat(matrix(x - min(x) + 1,nr=m,nc=1),1,n)
   lambda = repmat(matrix(lambda,nr=1,nc=n), m, 1)
   
   stopifnot(all(dim(x) == dim(lambda)))
-  
   # use box cox transformation; mask to select which operation to perform
   x_l = x
-  x_l[lambda==0] = log(x[lambda==0])
-  x_l[lambda!=0] = (x[lambda!=0]^(lambda[lambda!=0])-1)/lambda[lambda!=0]
+  zmask = all.equal(lambda,0,tolerance=0.1) == TRUE
+  nzmask = !zmask
+  x_l[zmask] = log(x[zmask])
+  x_l[nzmask] = (x[nzmask]**lambda[nzmask]-1)/lambda[nzmask]
   return(x_l)
 }
 
@@ -88,9 +94,11 @@ boxcox = function(x,lambda){
 box_cox_likelihood = function(x,lambda){
   # box-cox likelihood function, target for maximization
   n = length(x)
+  # x must always be greater than 0
+  x = x - min(x) + 1
   xs = sum(log(x))
   x_to_the_lambda = boxcox(x,lambda)
-  l = -n/2 * log(1/n * colSums((x_to_the_lambda-mean(x_to_the_lambda))^2)) + (lambda-1)*xs
+  l = -n/2 * log(1/n * colSums((x_to_the_lambda-colMeans(x_to_the_lambda))^2)) + (lambda-1)*xs
   return(l)
 }
 
@@ -108,15 +116,23 @@ box_cox_likelihood = function(x,lambda){
 #' Load iris dataset 
 #' data('iris')
 #'
-#' # Plot likelihood across a range of lambdas
-#' lambdas = seq(-5,5,0.025)
-#' assess_normality
+#' assessment = normal_assessment(iris[1:25,1], significance=5)
 #' 
 normal_assessment = function(x, significance=5){
   stopifnot(significance>=1,significance<=10)
+  # Only allow one dimensional datasets
+  dims = dim(x)
+  stopifnot(length(dims)<=2)
+  if (length(dims) == 2){
+    stopifnot(min(dims)==1)
+  }
+  name = colnames(x)[1]
+  # reduce to 1d
+  x = matrix(drop(as.matrix(x)),nc=1)
+  colnames(x)[1] <- name
   
   # number of samples in variable
-  n = length(x)
+  n = length(drop(x))
   
   # We cannot safely proceed if sample size is too small
   stopifnot(n>=5)
@@ -133,7 +149,7 @@ normal_assessment = function(x, significance=5){
   
   # Estimate critical point
   critical_point = qq_crit(significance/100)
-  
+
   # sort x values 
   sorted = sort(x)
   
@@ -165,219 +181,343 @@ normal_assessment = function(x, significance=5){
   return(obj)
 }
 
+#' Summarize normal_assessment object; called implicitely.  
+#' 
+#' @param object normal_assessment object
+#' 
+#' @examples
+#' 
+#' # Load iris dataset 
+#' data('iris')
+#'
+#' summary(normal_assessment(iris[1:25,1], significance=5))
+#' 
 summary.normal_assessment <- function (object, ...) {
-  nms = names(object$x)
+  nms = colnames(object$x)
   if (is.null(nms)){
     name = 'V1'
   }else{
     name = nms[[1]]
   }
-  str = ''
-  str = str + paste(sprintf('Variable: %s', name), collapse="\n")
-  str = str + paste(summary(object$x), collapse="\n")
-  # Initial test of normality
-  
-  
+  dsum =  paste(capture.output(summary(drop(object$x))),collapse='\n')
+  model = sprintf('y = %fx + %f',object$model$coefficients[[2]], object$model$coefficients[[1]])
+  str = '\n'
+  str = paste(str, sprintf('Variable Name: %s, Number of samples (n): %i\n\n', blue(name), length(object$x)), sep='')
+  str = paste(str, 'Basic Data stats:\n', dsum, '\n', sep='')
+  str = paste(str, 'Normality Assessment:\n', sep='')
+  # Unicode characters apparently break the formatter, so I had to increase the alignment length by 1 hear
+  str = paste(str, sprintf('%22s : %.2f%% \n','Significance (\U03B1)',object$significance), sep='')
+  str = paste(str, sprintf('%21s : %.4f \n','QQ Critical Point',object$critical_point), sep='')
+  str = paste(str, sprintf('%21s : [%s] \n','Normal Model',model), sep='')
+  str = paste(str, sprintf('%21s : %.4f \n','Measured Correlation',object$correlation), sep='')
+  if(object$isnormal){
+    assessment = green("IS \U2714")
+  }else{
+    assessment = red("IS NOT \U2717")
+  }
+  str = paste(str, sprintf('\nDataset %s normal for significance level %.2f%%',assessment, object$significance), sep='')
   cat(str)
 }
 
-# print.normal <- function (object, ...) {
-#   print(paste(
-#       sprintf('Dataset has %i variables: ',length(variable.names(object$dataset))),
-#       paste(variable.names(iris),collapse='; ')
-#   ))
-# }
-# 
-# 
-# plot.normal <- function (object, ...) {
-#   assessments = object$assessments
-#   first = assessments[[1]]
-#   
-#   if (all(is.na(first$transformed))){
-#     assessment = first$assessment
-#   }else{
-#     lambda = first$transformed$lambda
-#     print(sprintf('Transformed with lambda=%.2f',lambda))
-#     assessment = first$transformed$assessment
-#   }
-#   
-#   # build data frame
-#   df <- data.frame(
-#     q=assessment$quartile_samples,
-#     sorted=assessment$sorted_sample,
-#     predicted=predict(assessment$model),
-#     residuals=residuals(assessment$model)
-#   )
-#   
-#   model_a=assessment$model$coefficients[[1]]
-#   model_b=assessment$model$coefficients[[2]]
-#   
-#   # QQ Plot showing residuals 
-#   #
-#   # Plot thanks to this fantastic tutorial:
-#   # 
-#   # https://drsimonj.svbtle.com/visualising-residuals
-#   #
-#   ggplot(df, aes(q, sorted)) +
-#   geom_segment(aes(xend = q, yend = predicted), alpha = 0.4) +
-#   geom_point(aes(color = residuals)) +
-#   scale_color_gradient2(low = "blue", mid = "white", high = "red") +
-#   guides(color = FALSE) + theme_bw() + 
-#   geom_abline(intercept = model_a, slope = model_b, linetype="dashed", size=0.15)
-# }
-
-
-
-
-
-
-
-#' Given a dataframe, assess normality of each numeric variable. 
-#' When a variable exhibits non-normal behavior, attempt to
-#' transform to normality. 
+#' Summarize normal_assessment object; called implicitely.  
 #' 
-#' @param dataset Validate normality of each variable within this dataset
-#' @param significance Will attempt to verify each variable's normality to within 
-#' this significance
-#' @param boxcox_lambda_search When the significance test fails, will attempt to 
-#' find the lambda from within this range which most effectively transforms 
-#' the data to near-normality
+#' @param object normal_assessment object
 #' 
 #' @examples
-normal = function(dataset, significance=5, boxcox_lambda_search=seq(-5,5,0.05))
-{
-  stopifnot(!missing(dataset))
-  stopifnot(class(dataset)=="data.frame")
-  stopifnot(length(dim(dataset)) < 3)
-  stopifnot(length(dim(dataset)) > 0)
-  
-  # extract portion of dataset which is numeric
-  dset_numeric = dataset[,sapply(dataset, function(x) is.numeric(x)),drop=FALSE]
-  if (!all(dim(dset_numeric) != dim(dataset))){
-    print('Ignoring non-numeric variables...')
-  }
-  
-  n = dim(dset_numeric)[1]
-  p = dim(dset_numeric)[2]
-  print(sprintf('Checking normality of N=%i samples of the variables [%s]...', n, paste(names(dset_numeric), collapse = ', ')))
-  
-  assessments <- vector("list", p)
-  for (i in 1:p){
-    name = names(dset_numeric)[i]
-    x = dset_numeric[,i]
-    
-    # Initial test of normality
-    assessment=normal_assessment(x, significance=significance)
-    
-    if(assessment$isnormal){
-      print(sprintf('- Variable %s is normal to within %.2f%% significance!', name, significance))
-      transformed_x = NA
-    }else{
-      print(sprintf('- Variable %s failed the %.2f%% significance test!', name, significance))
-      # Estimate lambda for boxcox transformation to attempt a transform to normality
-      print('Attempting to find a boxcox transformation to normalize the dataset...')
-      lambda = boxcox_lambda_search[which.max(
-        box_cox_likelihood(x, boxcox_lambda_search)
-      )]
-      # could not get R's optimization tools to work, so just call this "close enough".
-      # It's an estimate anyway.
-      d = boxcox(x, lambda)
-      transformed_x = list(
-        data=d,
-        lambda=lambda,
-        assessment=normal_assessment(d)
-      )
-    }
-    
-    # store for later
-    assessments[[i]] = list(
-      assessment=assessment,
-      transformed=transformed_x
-    )
-  }
-  
-  obj = list(
-    original=dataset, 
-    assessments=assessments
-  )
-  # obj is now a list of class `list` and `normal`
-  class(obj) = append(class(obj),"normal") 
-  return(obj)
+#' 
+#' # Load iris dataset 
+#' data('iris')
+#'
+#' summary(normal_assessment(iris[1:25,1], significance=5))
+#' 
+print.normal_assessment <- function (object, ...) {
+  summary(object)
 }
 
-
-
-summary.normal <- function (object, ...) {
-  assessments = object$assessments
-  dataset = object$original
-  for (i in 1:length(assessments)){
-    # Initial test of normality
-    assessment = assessments[[i]]
-    name = names(dataset)[[i]]
-    significance = assessment$assessment$significance
-    if(assessment$assessment$isnormal){
-      print(sprintf('Variable %s is normal to within %.2f%% significance!', name, significance))
-    }else{
-      print(sprintf('Variable %s is not normal within %.2f%% significance test!', name, significance))
-    }
-  }
-}
-
-print.normal <- function (object, ...) {
-  print(paste(
-      sprintf('Dataset has %i variables: ',length(variable.names(object$dataset))),
-      paste(variable.names(iris),collapse='; ')
-  ))
-}
-
-
-plot.normal <- function (object, ...) {
-  assessments = object$assessments
-  first = assessments[[1]]
-  
-  if (all(is.na(first$transformed))){
-    assessment = first$assessment
-  }else{
-    lambda = first$transformed$lambda
-    print(sprintf('Transformed with lambda=%.2f',lambda))
-    assessment = first$transformed$assessment
-  }
-  
+#' Create QQ plot from a normality_assessment object; called implicitely.  
+#' 
+#' @param object normal_assessment object
+#' 
+#' @examples
+#' 
+#' # Load iris dataset 
+#' data('iris')
+#'
+#' plot(normal_assessment(iris[1:25,1], significance=5))
+#' 
+plot.normal_assessment <- function (object, ...) {
   # build data frame
   df <- data.frame(
-    q=assessment$quartile_samples,
-    sorted=assessment$sorted_sample,
-    predicted=predict(assessment$model),
-    residuals=residuals(assessment$model)
+    q=object$quartile_samples,
+    sorted=object$sorted_sample,
+    predicted=predict(object$model),
+    residuals=residuals(object$model)
   )
   
-  model_a=assessment$model$coefficients[[1]]
-  model_b=assessment$model$coefficients[[2]]
+  name = colnames(object$x)[1]
+  if (object$isnormal){
+    msg = 'Normal'
+  }else{
+    msg = 'Not normal'
+  }
   
-  # QQ Plot showing residuals 
+  model_a=object$model$coefficients[[1]]
+  model_b=object$model$coefficients[[2]]
+
+  # QQ Plot showing residuals
   #
   # Plot thanks to this fantastic tutorial:
-  # 
+  #
   # https://drsimonj.svbtle.com/visualising-residuals
   #
   ggplot(df, aes(q, sorted)) +
   geom_segment(aes(xend = q, yend = predicted), alpha = 0.4) +
   geom_point(aes(color = residuals)) +
   scale_color_gradient2(low = "blue", mid = "white", high = "red") +
-  guides(color = FALSE) + theme_bw() + 
-  geom_abline(intercept = model_a, slope = model_b, linetype="dashed", size=0.15)
+  guides(color = FALSE) + theme_bw() +
+  geom_abline(intercept = model_a, slope = model_b, linetype="dashed", size=0.15) + 
+  ggtitle(sprintf('%s, %s; R=%.2f',name,msg,object$correlation)) + 
+    xlab("Quantiles") + ylab("Observations")
 }
 
-# load iris dataset
-data('iris')
 
-# just use one species
-setosa = subset(iris, Species == "setosa")[1:5]
+#' Given a dataframe, assess normality of each numeric variable.
+#' When a variable exhibits non-normal behavior, attempt to
+#' transform to normality.
+#'
+#' @param dataset Validate normality of each variable within this dataset
+#' @param significance Will attempt to verify each variable's normality to within
+#' this significance
+#' @param boxcox_lambda_search When the significance test fails, will attempt to
+#' find the lambda from within this range which most effectively transforms
+#' the data to near-normality
+#'
+#' @examples
+#' data('iris')
+#' irisnorm = normal(iris[1:25,])
+normal = function(dataset, significance=5, boxcox_lambda_search=seq(-5,5,0.01))
+{
+  stopifnot(!missing(dataset))
+  # if this fails you're in trouble
+  dataset = data.frame(dataset)
+  stopifnot(length(dim(dataset)) < 3)
+  stopifnot(length(dim(dataset)) > 0)
+  
+  str = 'Creating normal object for dataset!\n'
+  
+  # extract portion of dataset which is numeric
+  dset_numeric = dataset[,sapply(dataset, function(x) is.numeric(x)),drop=FALSE]
+  excluded = setdiff(names(dataset), names(dset_numeric))
+  if (!isempty(excluded)){
+    str = paste(str, sprintf(
+      red('Dataset has non-numeric variables [%s]!\n'),
+      paste(excluded, collapse = ', ')), 
+      ' * Please be sure each column of the dataset includes samples from ',
+      red('only'),
+      ' a single population.\n\n',
+      sep=''
+    )
+  }
+  n = dim(dset_numeric)[1]
+  p = dim(dset_numeric)[2]
+  str = paste(str, sprintf(
+    'Checking normality of N=%i samples of the variables [%s]...\n',
+    n,
+    paste(names(dset_numeric), collapse = ', ')),
+    sep=''
+  )
+  assessments <- vector("list", p)
+  for (i in 1:p){
+    name = colnames(dset_numeric)[i]
+    x = as.matrix(dset_numeric[,i,drop=FALSE])
+    # Initial test of normality
+    assessment = normal_assessment(x, significance=significance)
 
-setosa_n  = normal(dataset=setosa)
+    if(assessment$isnormal){
+      str = paste(str, sprintf(
+        '- Variable %s is normal to within %.2f%% significance!\n',
+        name,
+        significance),
+        sep=''
+      )
+      transformed = NA
+    }else{
+      str = paste(str, sprintf(
+        '- Variable %s failed the %.2f%% significance test!\n',
+        name,
+        significance),
+        sep=''
+      )
+      str = paste(str, ' * Attempting to find a boxcox transformation to normalize the dataset...\n', sep='')
+      # Estimate lambda for boxcox transformation to attempt a transform to normality
+      lambda = boxcox_lambda_search[which.max(
+        box_cox_likelihood(x, boxcox_lambda_search)
+      )]
+      
+      str = paste(str, sprintf(' * \U03BB=%.2f maximizes the boxcox likelihood function!\n',lambda), sep='')
+      # could not get R's optimization tools to work, so just call this "close enough".
+      # It's an estimate anyway.
+      d = boxcox(x, lambda)
+      colnames(d) = colnames(x)
+      #stop()
+      transformed = list(
+        lambda=lambda,
+        assessment=normal_assessment(d, significance=significance)
+      )
+      if (transformed$assessment$isnormal){
+        result = green('IS')
+        using = 'Keeping transformation.'
+      }else{
+        result = red('IS NOT')
+        transformed = NA
+        using = 'Using original data'
+      }
+      str = paste(str, sprintf(' * Transformed data %s sufficiently normal! %s\n', result, using), sep='')
+    }
 
-plot(setosa_n)
+    # store for later
+    assessments[[i]] = list(
+      assessment=assessment,
+      transformed=transformed
+    )
+  }
+  obj = list(
+    dataset=dataset,
+    assessments=assessments
+  )
+  cat(str)
+  # obj is now a list of class `list` and `normal`
+  class(obj) = append(class(obj),"normal")
+  return(obj)
+}
 
-# summary(iris_red)
-# print(iris_red)
-# plot(iris_red)
+#' Run normal on a dataset and return a "normified" dataset, transformed when necessary 
+#' 
+#' @param data 2D Dataframe to normify.
+#' 
+#' @examples
+#' 
+#' # Load iris dataset 
+#' data('iris')
+#'
+#' normifed_data = normify(iris[1:25,], significance=5)
+#' 
+normify = function(data, ...){
+  UseMethod("normify")
+  return(normify.normal(normal(data, ...)))
+}
+
+#' Return "normified" dataset from a preallocated normal object 
+#' 
+#' @param data Dataset to normify
+#' 
+normify.normal <- function(object, ...){
+  assessments = object$assessments
+  datalist = list()
+  for (i in 1:length(assessments)){
+    assessment = assessments[[i]]$assessment
+    transformed = assessments[[i]]$transformed
+    lambda = ''
+    if (!all(is.na(transformed))){
+      # Data was transformed
+      # Use transformed assessment
+      assessment = transformed$assessment
+      lambda = sprintf('.L.%.2f',transformed$lambda) 
+    }
+    datalist[[i]] = assessment$x
+    colnames(datalist[[i]])[1] = paste(colnames(datalist[[i]])[1], lambda, sep='')
+  }
+  return(as.data.frame(datalist))
+}
+
+#' Summarize content of a normal object; called implicitely.  
+#' 
+#' @param object normal object
+#' 
+#' @examples
+#' 
+#' # Load iris dataset 
+#' data('iris')
+#'
+#' summary(normal(iris[1:25,], significance=5))
+#' 
+summary.normal <- function (object, ...) {
+  assessments = object$assessments
+  for (i in 1:length(assessments)){
+    cat(yellow(sprintf('-----------------  Column %i  ------------------',i)))
+    # Initial test of normality
+    assessment = assessments[[i]]$assessment
+    transformed = assessments[[i]]$transformed
+    if (!all(is.na(transformed))){
+      # Data was transformed
+      cat(red(sprintf('\n\n !! Variable was transformed with \U03BB=%.2f !!\n',transformed$lambda)))
+      # Use transformed assessment
+      assessment = transformed$assessment
+    }
+    summary(assessment)
+    cat('\n\n')
+  }
+}
+
+#' Print some info about a normal object; called implicitely.  
+#' 
+#' @param object normal object
+#' 
+#' @examples
+#' 
+#' # Load iris dataset 
+#' data('iris')
+#'
+#' print(normal(iris[1:25,], significance=5))
+#' 
+print.normal <- function (object, ...) {
+  assessments = object$assessments
+  dataset = object$dataset
+  cat(sprintf('\n%-20s| %10s | %-10s\n','Variable name', 'Normal?','Transformed'))
+  cat('---------------------------------------------------\n')
+  for (i in 1:length(assessments)){
+    # Initial test of normality
+    assessment = assessments[[i]]$assessment
+    transformed = assessments[[i]]$transformed
+    str = 'No'
+    if (!all(is.na(transformed))){
+      # Data was transformed
+      str = red(sprintf('\U03BB=%.2f',transformed$lambda))
+      # Use transformed assessment
+      assessment = transformed$assessment
+    }
+    if (assessment$isnormal){
+      isnormal = 'Normal'
+    }else{
+      isnormal = 'Not Normal'
+    }
+    cat(sprintf('%-20s| %10s | %-10s\n', colnames(dataset)[i] ,isnormal, str))
+  }
+}
+
+#' Generate QQ plots for each variable in the dataset.  
+#' 
+#' @param object normal object
+#' 
+#' @examples
+#' 
+#' # Load iris dataset 
+#' data('iris')
+#'
+#' plot(normal(iris[1:25,], significance=5))
+#' 
+plot.normal <- function (object, ...) {
+  assessments = object$assessments
+  ps = list()
+  for (i in 1:length(assessments)){
+    assessment = assessments[[i]]
+    if (all(is.na(assessment$transformed))){
+      assessment = assessment$assessment
+    }else{
+      lambda = first$transformed$lambda
+      assessment = assessment$transformed$assessment
+    }
+    ps[[i]] = plot(assessment)
+  }
+  grid.arrange(grobs=ps)
+}
