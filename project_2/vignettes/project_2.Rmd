@@ -18,7 +18,7 @@ knitr::opts_chunk$set(
 
 # Introduction
 
-This package was developed for Project 2 for MATH5793, which calls for the creation of an S3 class for performing multivariate techniques on datasets. 
+This package was developed for Project 2 for MATH5793, which calls for the creation of an S3 class for performing multivariate techniques on datasets. This package specifically aims to validate whether or not each variable within a given 2D dataset is distributed approximately normally. The package may be installed as follows:
 
 ```{r, eval=FALSE}
 devtools::install_github('matt-m-herndon/MATH5793_project_2')

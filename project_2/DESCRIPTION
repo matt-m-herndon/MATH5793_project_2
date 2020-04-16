@@ -1,0 +1,18 @@
+Package: project2normal
+Type: Package
+Title: Project 2
+Version: 0.1.0
+Author: Matthew Herndon
+Description: Determines which variables within a dataset are approximately normal, and attempts to transform to normality when possible.
+Encoding: UTF-8
+LazyData: true
+Suggests: knitr, rmarkdown
+VignetteBuilder: knitr
+Imports:
+    rprojroot,
+    pracma,
+    akima,
+    ggplot2,
+    crayon,
+    gridExtra
+RoxygenNote: 7.0.2

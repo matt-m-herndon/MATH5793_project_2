@@ -1,6 +1,5 @@
 library(rprojroot)
 library(pracma)
-library(abind)
 library(akima)
 library(ggplot2)
 library(crayon)
