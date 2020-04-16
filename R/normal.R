@@ -112,7 +112,7 @@ box_cox_likelihood = function(x,lambda){
 #' lambdas = seq(-5,5,0.025)
 #' assess_normality
 #' 
-_normal_assessment = function(x, significance=5){
+normal_assessment = function(x, significance=5){
   stopifnot(significance>=1,significance<=10)
   
   # number of samples in variable
