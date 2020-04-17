@@ -1,9 +1,3 @@
-library(pracma)
-library(akima)
-library(ggplot2)
-library(crayon)
-library(gridExtra)
-
 fpath <- system.file("exdata", "table_4_2_qq_critical.csv", package="project2normal")
 # Table 4.2 from the book
 qq_critical_points = read.csv(fpath)
@@ -44,7 +38,10 @@ qqspline = function(n){
 #' # Now try it again for a series of lambdas
 #' transformed = boxcox(iris[1:25,1], c(1.23, 1.25, 2.53))
 #' 
+#' @export
 boxcox = function(x,lambda){
+  library(pracma)
+  
   if (!is.matrix(x)) {
     x = matrix(x)
   }
@@ -89,6 +86,7 @@ boxcox = function(x,lambda){
 #' lambdas = seq(-5,5,0.025)
 #' plot(lambdas, box_cox_likelihood(iris[1:25,1], lambdas)
 #' 
+#' @export
 box_cox_likelihood = function(x,lambda){
   # box-cox likelihood function, target for maximization
   n = length(x)
@@ -116,6 +114,7 @@ box_cox_likelihood = function(x,lambda){
 #'
 #' assessment = normal_assessment(iris[1:25,1], significance=5)
 #' 
+#' @export
 normal_assessment = function(x, significance=5){
   stopifnot(significance>=1,significance<=10)
   # Only allow one dimensional datasets
@@ -190,7 +189,10 @@ normal_assessment = function(x, significance=5){
 #'
 #' summary(normal_assessment(iris[1:25,1], significance=5))
 #' 
+#' @export
 summary.normal_assessment <- function (object, ...) {
+  library(crayon)
+  
   nms = colnames(object$x)
   if (is.null(nms)){
     name = 'V1'
@@ -228,6 +230,7 @@ summary.normal_assessment <- function (object, ...) {
 #'
 #' summary(normal_assessment(iris[1:25,1], significance=5))
 #' 
+#' @export
 print.normal_assessment <- function (object, ...) {
   summary(object)
 }
@@ -243,7 +246,10 @@ print.normal_assessment <- function (object, ...) {
 #'
 #' plot(normal_assessment(iris[1:25,1], significance=5))
 #' 
+#' @export
 plot.normal_assessment <- function (object, ...) {
+  library(ggplot2)
+  
   # build data frame
   df <- data.frame(
     q=object$quartile_samples,
@@ -293,8 +299,12 @@ plot.normal_assessment <- function (object, ...) {
 #' @examples
 #' data('iris')
 #' irisnorm = normal(iris[1:25,])
+#' 
+#' @export
 normal = function(dataset, significance=5, boxcox_lambda_search=seq(-5,5,0.01))
 {
+  library(crayon)
+  
   stopifnot(!missing(dataset))
   # if this fails you're in trouble
   dataset = data.frame(dataset)
@@ -306,7 +316,7 @@ normal = function(dataset, significance=5, boxcox_lambda_search=seq(-5,5,0.01))
   # extract portion of dataset which is numeric
   dset_numeric = dataset[,sapply(dataset, function(x) is.numeric(x)),drop=FALSE]
   excluded = setdiff(names(dataset), names(dset_numeric))
-  if (!isempty(excluded)){
+  if (length(excluded)==0){
     str = paste(str, sprintf(
       red('Dataset has non-numeric variables [%s]!\n'),
       paste(excluded, collapse = ', ')), 
@@ -400,15 +410,19 @@ normal = function(dataset, significance=5, boxcox_lambda_search=seq(-5,5,0.01))
 #'
 #' normifed_data = normify(iris[1:25,], significance=5)
 #' 
+#' @export
 normify = function(data, ...){
-  UseMethod("normify")
-  return(normify.normal(normal(data, ...)))
+  UseMethod('normify', data, ...)
+}
+normify.default <- function(data, ...) {
+  return(normal(data, ...))
 }
 
 #' Return "normified" dataset from a preallocated normal object 
 #' 
 #' @param data Dataset to normify
 #' 
+#' @export
 normify.normal <- function(object, ...){
   assessments = object$assessments
   datalist = list()
@@ -439,7 +453,10 @@ normify.normal <- function(object, ...){
 #'
 #' summary(normal(iris[1:25,], significance=5))
 #' 
+#' @export
 summary.normal <- function (object, ...) {
+  library(crayon)
+  
   assessments = object$assessments
   for (i in 1:length(assessments)){
     cat(yellow(sprintf('-----------------  Column %i  ------------------',i)))
@@ -468,7 +485,10 @@ summary.normal <- function (object, ...) {
 #'
 #' print(normal(iris[1:25,], significance=5))
 #' 
+#' @export
 print.normal <- function (object, ...) {
+  library(crayon)
+  
   assessments = object$assessments
   dataset = object$dataset
   cat(sprintf('\n%-20s| %10s | %-10s\n','Variable name', 'Normal?','Transformed'))
@@ -504,7 +524,10 @@ print.normal <- function (object, ...) {
 #'
 #' plot(normal(iris[1:25,], significance=5))
 #' 
+#' @export
 plot.normal <- function (object, ...) {
+  library(gridExtra)
+  
   assessments = object$assessments
   ps = list()
   for (i in 1:length(assessments)){

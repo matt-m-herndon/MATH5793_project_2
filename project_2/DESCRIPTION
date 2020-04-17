@@ -10,8 +10,7 @@ Suggests: knitr, rmarkdown
 VignetteBuilder: knitr
 Imports:
     pracma,
-    akima,
     ggplot2,
     crayon,
     gridExtra
-RoxygenNote: 7.0.2
+RoxygenNote: 7.1.0
