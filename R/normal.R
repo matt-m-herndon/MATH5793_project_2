@@ -321,7 +321,7 @@ normal = function(dataset, significance=5, boxcox_lambda_search=seq(-5,5,0.01))
   # extract portion of dataset which is numeric
   dset_numeric = dataset[,sapply(dataset, function(x) is.numeric(x)),drop=FALSE]
   excluded = setdiff(names(dataset), names(dset_numeric))
-  if (length(excluded)==0){
+  if (length(excluded)>0){
     str = paste(str, sprintf(
       red('Dataset has non-numeric variables [%s]!\n'),
       paste(excluded, collapse = ', ')), 
