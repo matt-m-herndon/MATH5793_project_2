@@ -443,6 +443,9 @@ normify.normal <- function(object){
       lambda = sprintf('.L.%.2f',transformed$lambda) 
     }
     datalist[[i]] = assessment$x
+    if (!assessment$isnormal){
+      cat(red(sprintf('%s could be transformed to normality!\n',colnames(datalist[[i]])[1])))
+    }
     colnames(datalist[[i]])[1] = paste(colnames(datalist[[i]])[1], lambda, sep='')
   }
   return(as.data.frame(datalist))

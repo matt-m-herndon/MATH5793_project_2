@@ -14,6 +14,7 @@ knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>"
 )
+library(project2normal)
 ```
 
 # Introduction
@@ -26,41 +27,61 @@ devtools::install_github('matt-m-herndon/MATH5793_project_2')
 
 # Theory
 
-For a given one dimensional dataset, whether or not a 
+## QQ Correlation Coefficient Test for Normality
 
+For a given one dimensional dataset, one possible method for testing the normal assumption is called the **QQ correlation coefficient test for normality**. QQ plots pair uniformly spaced samples from the normal quantile distribution to ordered samples from a dataset. This mapping, in instances where the underling dataset is linear and of a sufficient size, will yield a QQ plot that is clustered linearly. Fitting a linear model to points in QQ space and correlating these points with the observation provides a measure of how "normal" the dataset is. 
+
+Exactly what the rejection criteria for this test should be under a host of different scenarios is well established. Using **Table 4.2** from the book, these critical points for a significance from 1% to 10% are found as follows:
+
+```{r, echo=FALSE, results='asis'}
+library(knitr)
+qqpoints = project2normal::critical_points()
+colnames(qqpoints) = c('n','\U03B1=0.01','\U03B1=0.05','\U03B1=0.10')
+kable(qqpoints, caption='Critical Points for QQ Correlation Coefficient Test for Normality')
+```
+
+For a given significance level $\alpha$ and for a given observation size $n$, if the correlation coefficient between the QQ space linear model and the observed data doesn't exceed the critical point, then the normal hypothesis is rejected.
+
+## Box-Cox Transformation to Near-Normality
+
+In instances where a dataset may be normally distributed but affected by some transformation (e.g. normally distributed in the log domain), transformations may be applied to the dataset to force the distribution to behave "approximately normally". One such transformation is called the Box-Cox transformation, defined as follows:
+
+$$
+x^{(\lambda)}=\left\{
+        \begin{array}{ll}
+            \frac{x^\lambda-1}{\lambda} & \quad \lambda \neq 0 \\
+            \text{ln}~x & \quad \lambda = 0
+        \end{array}
+    \right.
+$$
+
+For $x > 0$. The parameter $\lambda$ defines the strength of the transformation, and may be discovered via optimization of the Box-Cox likelihood function, defined as follows:
+
+$$
+l(\lambda) = -\frac{n}{2}\text{ln}\left[ \frac{1}{n}\sum_{j=1}^{n}(x_j^{(\lambda)}- \bar{x^{(\lambda)}})^2\right] + (\lambda - 1)\sum_{j=1}^n\text{ln}~x_j
+$$
+
+Maximizing $l(\lambda)$ for some dataset $x$ yields a $\lambda$ which may transform a dataset to near normality.
 
 # Classes
 
-Two classes are defined in the package. The simplest class, **normal_assessment**, aims to answer the question "is a given 1D dataset normal?". The more complex class, **normal**, aims to answer the same questions about each variable within 2D datasets while also attempting to find transformations to normality when variables aren't well behaved. 
+Two classes are defined in the package. The simplest class, **normal_assessment**, aims to answer the question "is a given 1D dataset normal?". The more complex class, **normal**, aims to answer the same questions about each variable within 2D datasets while also attempting to find transformations to normality when variables aren't well behaved. **normal** also contains a special method, **normify**, which is essentially just a wrapper around **normal** that returns the a new dataframe with any accepted transformations applied to the data. 
 
 ## normal_assessment
 
-At its core, this class aims only to determine if a given **1-D** dataset is normal. To do this, a version of the QQ Correlation test (wherein a linear model is fit to the QQ data and correlated against the observations) is implemented.
+At its core, this class aims only to determine if a given **1-D** dataset is normal. To do this, the **QQ Correlation Coefficient Test for Normality** was implemented in 1 dimension. This class creates and stores results from this test, namely:
 
-Tp
+1. Whether the test succeeded or not (is the data normal?)
+2. The significance tested for
+3. The critical point from **Table 4.2**
+4. The linear model fit to the observed QQ data
+5. The measured correlation coefficient
 
-This class contains information relating to the results,  
-
-  obj = list(
-    x=x,
-    isnormal=correlation>=critical_point,
-    model=model,
-    sorted_samples=sorted,
-    quartile_samples=q,
-    model_samples=model_samples,
-    correlation=correlation,
-    critical_point=critical_point,
-    significance=significance
-  )
-  
-S3 methods are defined for **print**, **plot**, and **summary** which provide the user   
-
-this defines methods for describing a one dimenbsio
-
-
-The following show example outputs of the S3 methods defined for this class.
+Together, this information provides the context necessary for the Class's methods to provide meaningful and intuitive output. Several S3 methods are defined for **normal_assessment**---**print**, **plot**, and **summary** each aim to provide the user with useful information about the dataset. The following show example outputs of these methods.
 
 ### Summary / Print
+
+Provide detailed results from the **QQ Correlation Coefficient Test for Normality**.
 
 ```{r}
 library(project2normal)
@@ -71,34 +92,74 @@ summary(assessment)
 
 ### Plot
 
-```{r}
+Generate a QQ plot for the dataset
+
+```{r, fig.width=7, fig.height=4}
 plot(assessment)
 ```
 
 
 ## normal
 
-Put sim
+**normal** bundles much of the functionality from **normal_assessment**, while also attempting to transform variables to normality when they fail the QQ correlation test. In addition to each variable's **normal_assessment**, this class stores a **normal_assessment** of the transformed variables with the $\lambda$ used in the transformation. 
 
 The following show example outputs of the S3 methods defined for this class.
 
-### Summary / Print
+### print
+
+Detail which variables are approximately normal and whether a transformation was successfully applied.
 
 ```{r}
 library(project2normal)
 # Grab a single species from the iris dataset
 norm_collection = normal(iris[1:25,,])
 # All variables are summarized
+print(norm_collection)
+```
+
+### summary
+
+Provides the full **normal_assessment** summary output for each variable within the dataset.
+
+```{r}
+# All variables are summarized
 summary(norm_collection)
 ```
 
-### Plot
+### plot
 
-```{r}
+Collects each of the **normal_assessment** plots for each variable within the dataset into a single plot.
+
+```{r, fig.width=7, fig.height=4}
 # All variables are plotted
 plot(norm_collection)
 ```
 
-# Other features
+### normify
+
+A wrapper around **normal** that returns a new dataframe. If for any variable a transformations was applied and accepted, the transformed data is returned with variables named to reflect the Box-Cox $\lambda$ parameter used for their transformation. For all other variables, the original data is returned.
+
+In the following example, we start with random noise with a transformation applied. 
+
+```{r}
+set.seed(0); 
+# Apply a transformation to the data
+x = 1.9**rnorm(100);
+```
+
+Calling **normal_assessment** on the data shows that it does not pass the test for normality. Additionally, the QQ plot reveals substancial non-linearity.
+ 
+```{r, fig.width=7, fig.height=4}
+assessment = normal_assessment(x)
+print(assessment)
+plot(assessment)
+```
+
+Now, if we run the same dataset through **normify**... The result is a transformed, approximately normal dataset!
+
+```{r, fig.width=7, fig.height=4}
+normified = normify(x)
+plot(normal(normified))
+```
 
 
