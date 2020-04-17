@@ -23,3 +23,82 @@ This package was developed for Project 2 for MATH5793, which calls for the creat
 ```{r, eval=FALSE}
 devtools::install_github('matt-m-herndon/MATH5793_project_2')
 ```
+
+# Theory
+
+For a given one dimensional dataset, whether or not a 
+
+
+# Classes
+
+Two classes are defined in the package. The simplest class, **normal_assessment**, aims to answer the question "is a given 1D dataset normal?". The more complex class, **normal**, aims to answer the same questions about each variable within 2D datasets while also attempting to find transformations to normality when variables aren't well behaved. 
+
+## normal_assessment
+
+At its core, this class aims only to determine if a given **1-D** dataset is normal. To do this, a version of the QQ Correlation test (wherein a linear model is fit to the QQ data and correlated against the observations) is implemented.
+
+Tp
+
+This class contains information relating to the results,  
+
+  obj = list(
+    x=x,
+    isnormal=correlation>=critical_point,
+    model=model,
+    sorted_samples=sorted,
+    quartile_samples=q,
+    model_samples=model_samples,
+    correlation=correlation,
+    critical_point=critical_point,
+    significance=significance
+  )
+  
+S3 methods are defined for **print**, **plot**, and **summary** which provide the user   
+
+this defines methods for describing a one dimenbsio
+
+
+The following show example outputs of the S3 methods defined for this class.
+
+### Summary / Print
+
+```{r}
+library(project2normal)
+# Grab a single variable from a single species from the iris dataset
+assessment = normal_assessment(iris[1:25,1,])
+summary(assessment)
+```
+
+### Plot
+
+```{r}
+plot(assessment)
+```
+
+
+## normal
+
+Put sim
+
+The following show example outputs of the S3 methods defined for this class.
+
+### Summary / Print
+
+```{r}
+library(project2normal)
+# Grab a single species from the iris dataset
+norm_collection = normal(iris[1:25,,])
+# All variables are summarized
+summary(norm_collection)
+```
+
+### Plot
+
+```{r}
+# All variables are plotted
+plot(norm_collection)
+```
+
+# Other features
+
+

@@ -416,11 +416,12 @@ normal = function(dataset, significance=5, boxcox_lambda_search=seq(-5,5,0.01))
 #' normifed_data = normify(iris[1:25,], significance=5)
 #' 
 #' @export
-normify = function(data, ...){
-  UseMethod('normify', data, ...)
+normify = function(data){
+  UseMethod('normify', data)
 }
-normify.default <- function(data, ...) {
-  return(normal(data, ...))
+#' @export
+normify.default = function(data){
+  return(normify(normal(data)))
 }
 
 #' Return "normified" dataset from a preallocated normal object 
@@ -428,7 +429,7 @@ normify.default <- function(data, ...) {
 #' @param data Dataset to normify
 #' 
 #' @export
-normify.normal <- function(object, ...){
+normify.normal <- function(object){
   assessments = object$assessments
   datalist = list()
   for (i in 1:length(assessments)){
@@ -540,7 +541,7 @@ plot.normal <- function (object, ...) {
     if (all(is.na(assessment$transformed))){
       assessment = assessment$assessment
     }else{
-      lambda = first$transformed$lambda
+      lambda = assessment$transformed$lambda
       assessment = assessment$transformed$assessment
     }
     ps[[i]] = plot(assessment)
