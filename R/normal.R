@@ -1,6 +1,10 @@
-fpath <- system.file("exdata", "table_4_2_qq_critical.csv", package="project2normal")
-# Table 4.2 from the book
-qq_critical_points = read.csv(fpath)
+
+critical_points = function(){
+  fpath <- system.file("exdata", "table_4_2_qq_critical.csv", package="project2normal")
+  # Table 4.2 from the book
+  return(read.csv(fpath))
+} 
+
 
 
 #' Spline generator along significance dimension---was going to use 2D splines,
@@ -17,6 +21,7 @@ qq_critical_points = read.csv(fpath)
 #' critical_points = q(seq(1,10,0.1))
 #' 
 qqspline = function(n){
+  qq_critical_points = critical_points()
   n_index = which(qq_critical_points[,1]>n)
   stopifnot(length(n_index)>0)
   return(splinefun(x=c(0.01,0.05,0.1), y=as.matrix(qq_critical_points[n_index[1],2:4]), method="fmm",  ties=mean))
